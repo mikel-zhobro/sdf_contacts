@@ -16,7 +16,10 @@ def _load_image(thing):
     return Image.fromarray(np.array(thing))
 
 def measure_text(name, text, width=None, height=None):
-    font = ImageFont.truetype(name, 96)
+    try:
+        font = ImageFont.truetype(name, 96)
+    except OSError:
+        font = ImageFont.load_default()
     x0, y0, x1, y1 = font.getbbox(text)
     aspect = (x1 - x0) / (y1 - y0)
     if width is None and height is None:
@@ -42,7 +45,10 @@ def measure_image(thing, width=None, height=None):
 @d2.sdf2
 def text(font_name, text, width=None, height=None, pixels=PIXELS, points=512):
     # load font file
-    font = ImageFont.truetype(font_name, points)
+    try:
+        font = ImageFont.truetype(font_name, points)
+    except OSError:
+        font = ImageFont.load_default()
 
     # compute texture bounds
     p = 0.2
