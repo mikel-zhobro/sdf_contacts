@@ -19,6 +19,7 @@ UP = Z
 _ops = {}
 
 class SDF3:
+    dim = 3
     def __init__(self, f):
         self.f = f
     def __call__(self, p):
@@ -43,6 +44,8 @@ class SDF3:
         return mesh.save(path, self, *args, **kwargs)
     def show_slice(self, *args, **kwargs):
         return mesh.show_slice(self, *args, **kwargs)
+    def plot(self, path=None, *args, **kwargs):
+        return mesh.plot(path, self, *args, **kwargs)
 
 def sdf3(f):
     def wrapper(*args, **kwargs):

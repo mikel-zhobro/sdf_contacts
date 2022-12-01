@@ -18,6 +18,7 @@ from .mesh import (
     save,
     sample_slice,
     show_slice,
+    plot
 )
 
 from .stl import (

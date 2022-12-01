@@ -2,8 +2,7 @@ import functools
 import numpy as np
 import operator
 
-from . import dn, d3, ease
-
+from . import dn, d3, ease, mesh
 # Constants
 
 ORIGIN = np.array((0, 0))
@@ -18,6 +17,7 @@ UP = Y
 _ops = {}
 
 class SDF2:
+    dim = 2
     def __init__(self, f):
         self.f = f
     def __call__(self, p):
@@ -36,6 +36,10 @@ class SDF2:
     def k(self, k=None):
         self._k = k
         return self
+    def save(self, path, *args, **kwargs):
+        return mesh.save(path, self, *args, **kwargs)
+    def plot(self, path=None, *args, **kwargs):
+        return mesh.plot(path, self, *args, **kwargs)
 
 def sdf2(f):
     def wrapper(*args, **kwargs):
