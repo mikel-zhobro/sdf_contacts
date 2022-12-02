@@ -154,13 +154,13 @@ def generate(
             points.extend(result)
     bar.done()
 
+    seconds = time.time() - start
     if verbose:
         print('%d skipped, %d empty, %d nonempty' % (skipped, empty, nonempty))
         triangles = len(points) // 3
-        seconds = time.time() - start
         print('%d triangles in %g seconds' % (triangles, seconds))
 
-    return points
+    return points, seconds
 
 # function to transform 2D trinagles to 3D triangles
 def _triangles_to_3d(triangles):
@@ -170,7 +170,7 @@ def _triangles_to_3d(triangles):
 
 
 def save(path, *args, **kwargs):
-    points = generate(*args, **kwargs)
+    points, seconds = generate(*args, **kwargs)
     points = np.array(points)
     if points.shape[1] == 2:
         n = points.shape[0] //4
@@ -182,6 +182,7 @@ def save(path, *args, **kwargs):
     else:
         mesh = _mesh(points)
         mesh.write(path)
+    return seconds
 
 def _mesh(points):
     import meshio
@@ -193,7 +194,7 @@ def plot(path=None, *args, **kwargs):
     sdf = args[0]
     n = sdf.dim
     bounds = _estimate_bounds(sdf)
-    points = generate(*args, **kwargs)
+    points, seconds = generate(*args, **kwargs)
 
     if n ==3:
         mesh = Poly3DCollection(np.array(points).reshape(-1, 3, 3))

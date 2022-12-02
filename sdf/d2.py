@@ -36,6 +36,8 @@ class SDF2:
     def k(self, k=None):
         self._k = k
         return self
+    def generate(self, *args, **kwargs):
+        return mesh.generate(self, *args, **kwargs)
     def save(self, path, *args, **kwargs):
         return mesh.save(path, self, *args, **kwargs)
     def plot(self, path=None, *args, **kwargs):

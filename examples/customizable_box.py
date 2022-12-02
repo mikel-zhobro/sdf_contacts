@@ -51,5 +51,5 @@ def lid():
     f &= slab(z1=LID_DEPTH).k(TOP_FILLET)
     return f
 
-box().save('box.stl', samples=SAMPLES)
-lid().save('lid.stl', samples=SAMPLES)
+box().save('outputs/box.stl', samples=SAMPLES)
+lid().save('outputs/lid.stl', samples=SAMPLES)
