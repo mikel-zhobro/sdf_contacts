@@ -1,5 +1,6 @@
 import functools
 import numpy as np
+from typing import Callable
 import operator
 
 from . import dn, d3, ease, mesh
@@ -36,23 +37,53 @@ class SDF2:
     def k(self, k=None):
         self._k = k
         return self
+    def generate(self, *args, **kwargs):
+        return mesh.generate(self, *args, **kwargs)
     def save(self, path, *args, **kwargs):
         return mesh.save(path, self, *args, **kwargs)
     def plot(self, path=None, *args, **kwargs):
         return mesh.plot(path, self, *args, **kwargs)
 
-def sdf2(f):
+    # Operators
+    def translate(self, offset): return translate(self, offset)
+    def scale(self, factor): return scale(self, factor)
+    def rotate(self, angle): return rotate(self, angle)
+    def circular_array(self, count): return circular_array(self, count)
+    def elongate(self, size): return elongate(self, size)
+
+    # 2D => 3D
+    def extrude(self, h): return extrude(self, h)
+    def extrude_to(self, b, h, e=ease.linear): return extrude_to(self, b, h, e)
+    def revolve(self, offset=0): return revolve(self, offset)
+
+    # Common
+    def union(self, *bs, k=None): return union(self, *bs, k=k)
+    def difference(self, *bs, k=None): return difference(self, *bs, k=k)
+    def intersection(self, *bs, k=None): return intersection(self, *bs, k=k)
+    def blend(self, *bs, k=0.5): return blend(self, *bs, k=k)
+
+    def negate(self): return negate(self)
+    def dilate(self, r): return dilate(self, r)
+    def erode(self, r): return erode(self, r)
+    def shell(self, thickness): return shell(self, thickness)
+    def repeat(self, spacing, count=None, padding=0): return repeat(self, spacing, count, padding)
+
+
+# ----------------------------------------------------------------
+# Definitions
+# ----------------------------------------------------------------
+def sdf2(f: Callable[..., SDF2]) -> Callable[..., SDF2]:
     def wrapper(*args, **kwargs):
         return SDF2(f(*args, **kwargs))
     return wrapper
 
-def op2(f):
+def op2(f: SDF2) -> Callable[..., SDF2]:
     def wrapper(*args, **kwargs):
         return SDF2(f(*args, **kwargs))
     _ops[f.__name__] = wrapper
     return wrapper
 
-def op23(f):
+def op23(f: SDF2):
     def wrapper(*args, **kwargs):
         return d3.SDF3(f(*args, **kwargs))
     _ops[f.__name__] = wrapper
