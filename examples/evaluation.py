@@ -16,6 +16,7 @@ sdfs_names = ['blobby', 'gear', 'weave', 'knurling', 'pawn', 'text', 'image', 'e
 
 
 
+# times = [f.save(f"outputs/{n}.stl", samples=2**5) for f, n in zip(eval_sdfs, sdfs_names)]
 times = [f.generate(samples=2**8)[1] for f in eval_sdfs]
 
 for name, time in zip(sdfs_names, times):

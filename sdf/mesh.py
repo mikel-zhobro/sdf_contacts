@@ -172,7 +172,7 @@ def _triangles_to_3d(triangles):
 def save(path, *args, **kwargs):
     points, seconds = generate(*args, **kwargs)
     points = np.array(points)
-    if points.shape[1] == 2:
+    if len(points) > 0 and points.shape[1] == 2:
         n = points.shape[0] //4
         points = points[:n*4].reshape(-1, 2, 2)
         points = np.concatenate([points, np.sum(points, axis=1, keepdims=True)/2.], axis=1).reshape(-1, 2)

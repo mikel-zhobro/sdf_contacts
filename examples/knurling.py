@@ -18,4 +18,4 @@ f -= c.translate(Z * -2.5).k(0.1)
 f -= c.translate(Z * 2.5).k(0.1)
 
 if __name__ == "__main__":
-    f.save('knurling.stl', samples=2**8)
+    f.save('outputs/knurling.stl', samples=2**4)
