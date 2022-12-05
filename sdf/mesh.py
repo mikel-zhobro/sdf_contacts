@@ -14,7 +14,7 @@ WORKERS = multiprocessing.cpu_count()
 SAMPLES = 2 ** 6
 BATCH_SIZE = 32
 
-def _cartesian_product(*arrays):
+def cartesian_product(*arrays):
     la = len(arrays)
     dtype = np.result_type(*arrays)
     arr = np.empty([len(a) for a in arrays] + [la], dtype=dtype)
@@ -22,7 +22,7 @@ def _cartesian_product(*arrays):
         arr[...,i] = a
     return arr.reshape(-1, la)
 
-def _estimate_bounds(sdf):
+def estimate_bounds(sdf):
     """
     ------ Estimate bounds of the sdf (dimension agnostic) ------
     starts with a small cube and expands it until sdf is contained
@@ -40,7 +40,7 @@ def _estimate_bounds(sdf):
         if threshold == prev:
             break
         prev = threshold
-        P = _cartesian_product(*Cs) # shape: (s**n, n) where n can be 2 or 3
+        P = cartesian_product(*Cs) # shape: (s**n, n) where n can be 2 or 3
         volume = sdf(tu.to_torch(P)).reshape(tuple([len(X) for X in Cs])) # (s, s, s) or (s, s)
         where = np.argwhere(np.abs(volume.numpy()) <= threshold+1)
 
@@ -84,7 +84,7 @@ def _worker(sdf, job, sparse):
     if sparse and n==3 and _skip(sdf, job):
         return None
         # return _debug_triangles(*job)
-    P = _cartesian_product(*job)
+    P = cartesian_product(*job)
     volume = sdf(tu.to_torch(P)).numpy().reshape(tuple([len(X) for X in job]))
     try:
         points = points = _marching(volume)
@@ -109,7 +109,7 @@ def generate(
     n = sdf.dim
 
     if bounds is None:
-        bounds = _estimate_bounds(sdf)
+        bounds = estimate_bounds(sdf)
     x0, x1 = bounds # x0: lower bounds (3,), x1: upper bounds (3,)
 
     if step is None:
@@ -125,7 +125,6 @@ def generate(
         print('step', *dx, sep=' ')
 
     X = [np.arange(x0_, x1_, dx_) for x0_, x1_, dx_ in zip(x0, x1, dx)]
-    # X = [np.linspace(x0_, x1_, num) for x0_, x1_, dx_, num in zip(x0, x1, dx, (x1 - x0) // step)]
     # we need only one batch for 2D, so we find only one contour
     s = batch_size if n==3 else len(X[0])
     Xs = [[X_t[i:i+s+1] for i in range(0, len(X_t), s)] for X_t in X]
@@ -162,13 +161,6 @@ def generate(
 
     return points, seconds
 
-# function to transform 2D trinagles to 3D triangles
-def _triangles_to_3d(triangles):
-    "triangles: (n, 2, 2)"
-    "returns (n, 3, 3)"
-
-
-
 def save(path, *args, **kwargs):
     points, seconds = generate(*args, **kwargs)
     points = np.array(points)
@@ -193,7 +185,7 @@ def _mesh(points):
 def plot(path=None, *args, **kwargs):
     sdf = args[0]
     n = sdf.dim
-    bounds = _estimate_bounds(sdf)
+    bounds = estimate_bounds(sdf)
     points, seconds = generate(*args, **kwargs, bounds=bounds)
 
     if n ==3:
@@ -224,7 +216,7 @@ def sample_slice(
     x=None, y=None, z=None, bounds=None):
 
     if bounds is None:
-        bounds = _estimate_bounds(sdf)
+        bounds = estimate_bounds(sdf)
     (x0, y0, z0), (x1, y1, z1) = bounds
 
     if x is not None:
@@ -248,7 +240,7 @@ def sample_slice(
     else:
         raise Exception('x, y, or z position must be specified')
 
-    P = _cartesian_product(X, Y, Z)
+    P = cartesian_product(X, Y, Z)
     return sdf(tu.to_torch(P)).reshape((w, h)), extent, axes
 
 def show_slice(*args, **kwargs):

@@ -16,7 +16,10 @@ from .mesh import (
     save,
     sample_slice,
     show_slice,
-    plot
+    plot,
+    estimate_bounds,
+    cartesian_product
+
 )
 
 from .stl import (
