@@ -20,7 +20,7 @@ _ops = {}
 
 class SDF2:
     dim = 2
-    def __init__(self, f):
+    def __init__(self, f: Callable[[torch.Tensor], torch.Tensor]):
         self.f = f
     def __call__(self, p):
         return self.f(p).reshape((-1, 1))
@@ -189,10 +189,10 @@ def hexagon(r):
     def f(p):
         r_torch = tu.to_torch(r)
         k = tu.to_torch([3 ** 0.5 / -2, 0.5, math.tan(math.pi / 6)])
-        p = p.abs()
-        p -= 2 * k[:2] * _min(_dot(k[:2], p), 0).reshape((-1, 1))
-        p -= _vec(p[:,0].clamp(-k[2] * r_torch, k[2] * r_torch),torch.zeros_like(p[:,0]) + r_torch)
-        return _length(p) * torch.sign(p[:,1])
+        p0 = p.abs()
+        p1 = p0 - 2 * k[:2] * _min(_dot(k[:2], p0), 0).reshape((-1, 1))
+        p2 = p1 - _vec(p1[:,0].clamp(-k[2] * r_torch, k[2] * r_torch),torch.zeros_like(p1[:,0]) + r_torch)
+        return _length(p2) * torch.sign(p2[:,1])
     return f
 
 @sdf2

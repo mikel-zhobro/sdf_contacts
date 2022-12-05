@@ -22,7 +22,7 @@ _ops = {}
 
 class SDF3:
     dim = 3
-    def __init__(self, f):
+    def __init__(self, f: Callable[[torch.Tensor], torch.Tensor]):
         self.f = f
     def __call__(self, p):
         return self.f(p).reshape((-1, 1))

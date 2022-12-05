@@ -121,7 +121,7 @@ def _sdf(width, height, pixels, px, py, im):
 
     def f(p):
         old_p = p
-        p = p.cpu().numpy()
+        p = p.detach().cpu().numpy()
         x = p[:,0]
         y = p[:,1]
         u = (x - x0) / (x1 - x0)
@@ -130,7 +130,7 @@ def _sdf(width, height, pixels, px, py, im):
         i = u * pw + px
         j = v * ph + py
         d = _bilinear_interpolate(texture, i, j)
-        q = rectangle(old_p).cpu().numpy().reshape(-1)
+        q = rectangle(old_p).detach().cpu().numpy().reshape(-1)
         outside = (i < 0) | (i >= tw-1) | (j < 0) | (j >= th-1)
         d[outside] = q[outside]
         return torch.from_numpy(d).to(old_p)

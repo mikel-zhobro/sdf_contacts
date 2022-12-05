@@ -22,7 +22,7 @@ def cartesian_product(*arrays):
         arr[...,i] = a
     return arr.reshape(-1, la)
 
-def estimate_bounds(sdf):
+def estimate_bounds(sdf, verbose=True):
     """
     ------ Estimate bounds of the sdf (dimension agnostic) ------
     starts with a small cube and expands it until sdf is contained
@@ -46,7 +46,8 @@ def estimate_bounds(sdf):
 
         c1 = c0 + where.max(axis=0) * d + d / 2
         c0 = c0 + where.min(axis=0) * d - d / 2
-    print(c0, c1)
+    if verbose:
+        print(c0, c1)
     return c0, c1
 
 def _worker(sdf, job, sparse):
@@ -200,14 +201,14 @@ def plot(path=None, *args, **kwargs):
         ax.set_ylim(bottom=bounds[0][1], top=bounds[1][1])
         ax.set_zlim(bounds[0][2], bounds[1][2])
     else:
-        fig, ax = plt.subplots()
+        # fig, ax = plt.subplots()
         points = np.array(points).reshape(-1, 2)
-        ax.plot(points[:, 1], points[:, 0], linewidth=2)
+        plt.plot(points[:, 1], points[:, 0], linewidth=2)
     # ax.view_init(20, -45)
     if path is not None:
         plt.savefig(path)
-    else:
-        plt.show()
+    # else:
+    #     plt.show()
 # --------------------------------------------------------------------
 # Plot Slice
 # --------------------------------------------------------------------
