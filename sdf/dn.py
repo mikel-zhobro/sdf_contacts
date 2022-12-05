@@ -81,7 +81,9 @@ def shell(other, thickness):
     return f
 
 def repeat(other, spacing, count=None, padding=0):
-    count = tu.to_torch(count) if count is not None else None
+    if count is not None:
+        count = tu.to_torch(count)
+        assert count.numel() == other.dim, f"make sure count({count}) matches the dimension of the sdf({other.dim})"
     spacing = tu.to_torch(spacing)
 
     def neighbors(dim, padding, spacing):
