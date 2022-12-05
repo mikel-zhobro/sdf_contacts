@@ -115,7 +115,6 @@ def generate(
     if step is None:
         volume = np.prod(x1 - x0)
         step = (volume / (samples**n)) ** (1 / n)
-        # step = ((x1 - x0) / samples) ** (1 / n)
 
     dx = np.zeros(n) # dx: step size (3,)
     dx[:] = step
