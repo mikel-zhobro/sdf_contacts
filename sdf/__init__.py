@@ -1,7 +1,5 @@
 from . import d2, d3, ease
 
-from .util import *
-
 from .d2 import *
 
 from .d3 import *
@@ -18,9 +16,14 @@ from .mesh import (
     save,
     sample_slice,
     show_slice,
-    plot
+    plot,
+    estimate_bounds,
+    cartesian_product
+
 )
 
 from .stl import (
     write_binary_stl,
 )
+
+from . import torch_util

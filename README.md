@@ -2,19 +2,20 @@
 
 This is a fork of [fogleman/sdf](https://github.com/fogleman/sdf) that uses PyTorch instead of numpy for batched computation. I was curious if a GPU could greatly speed up SDF evaluation. Initial benchmarks show that torch+GPU can give a significant speedup over numpy+CPU, and even torch+CPU gives a (smaller) speedup.
 
-Here are some timings from a few example scripts:
+Here are some timings from a few example scripts(for samples=2**8):
 
 
 | Example    | numpy    | torch, CPU | torch, GPU |
 |------------|----------|------------|------------|
-| blobby     | 9.295s   |   0s       |     0s     |  
-| gear       | 11.516s  |   0s       |     0s     |  
-| weave      | 221.054s |   0s       |     0s     |  
-| knurling   | 32.616s  |   0s       |     0s     |  
-| pawn       | 15.155s  |   0s       |     0s     |  
-| text       | 8.641s   |   0s       |     0s     |  
-| image      | 13.358s  |   0s       |     0s     |  
-| example    | 8.445s   |   0s       |     0s     |  
+| blobby     | 9.295s   | 5.860s     |     0s     |  
+| gear       | 11.516s  | 5.017s     |     0s     |  
+| weave      | 221.054s | 86.803s    |     0s     |  
+| knurling   | 32.616s  | 11.198s    |     0s     |  
+| pawn       | 15.155s  | 10.697s    |     0s     |  
+| text       | 8.641s   | 3.710s     |     0s     |  
+| image      | 13.358s  | 3.363s     |     0s     |  
+| example    | 8.445s   | 2.381s     |     0s     |  
+
 
 **Benchmark hardware:** one `Titan X (Pascal)` and an 8 hypercore `Intel(R) Core(TM) i7-6700K CPU @ 4.00GHz`.
 

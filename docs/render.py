@@ -1,16 +1,17 @@
 from sdf import *
 import os
 
-def generate(f, name, samples=2**26, **kwargs):
+def generate(f, name, samples=2**7, **kwargs):
     os.makedirs('models', exist_ok=True)
     os.makedirs('images', exist_ok=True)
     stl_path = 'models/%s.stl' % name
     png_path = 'images/%s.png' % name
     if os.path.exists(png_path):
         return
-    render_cmd = './render %s %s' % (stl_path, png_path)
+    # render_cmd = './render %s %s' % (stl_path, png_path)
+    print("\nGenerating %s" % name)
     f.save(stl_path, samples=samples, **kwargs)
-    os.system(render_cmd)
+    # os.system(render_cmd)
 
 # example
 f = sphere(1) & box(1.5)
@@ -108,7 +109,7 @@ generate(f, 'scale')
 
 # rotate(other, angle, vector=Z)
 # rotate_to(other, a, b)
-f = capped_cylinder(-Z, Z, 0.5).rotate(pi / 4, X)
+f = capped_cylinder(-Z, Z, 0.5).rotate(math.pi / 4, X)
 generate(f, 'rotate')
 
 # orient(other, axis)
@@ -174,7 +175,7 @@ f = example.elongate((0.25, 0.5, 0.75))
 generate(f, 'elongate')
 
 # twist(other, k)
-f = box().twist(pi / 2)
+f = box().twist(math.pi / 2)
 generate(f, 'twist')
 
 # bend(other, k)
@@ -215,7 +216,7 @@ generate(f, 'slice')
 
 # text(name, text, width=None, height=None, texture_point_size=512)
 f = rounded_box((7, 2, 0.2), 0.1)
-f -= text('Georgia', 'Hello, World!').extrude(0.2).rotate(pi).translate(0.1 * Z)
+f -= text('Georgia', 'Hello, World!').extrude(0.2).rotate(math.pi).translate(0.1 * Z)
 generate(f, 'text')
 
 # wrap_around(other, x0, x1, r=None, e=ease.linear)
