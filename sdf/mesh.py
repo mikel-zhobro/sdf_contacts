@@ -8,7 +8,7 @@ import itertools
 import numpy as np
 import time
 
-from . import progress, stl
+from . import progress, stl, torch_util as tu
 
 WORKERS = multiprocessing.cpu_count()
 SAMPLES = 2 ** 6
@@ -34,19 +34,19 @@ def _estimate_bounds(sdf):
     c1 = np.zeros(n) + 1e9 #
     prev = None
     for i in range(32):
-        Cs = [np.linspace(x0, x1, s) for x0, x1 in zip(c0, c1)] # linspace for each dimension
-        d = np.array([X[1] - X[0] for X in Cs]) # the diagonal of the cube
-        threshold = np.linalg.norm(d) / 2
+        Cs = [np.linspace(x0, x1, s) for x0, x1 in zip(c0, c1)] # linspace for each dimension - (s,s,s) cubes
+        d = np.array([X[1] - X[0] for X in Cs]) # the diagonal of one of the (s,s,s) cubes
+        threshold = np.linalg.norm(d) * 2 /3 # closer than the half of the diagonal is considered inside (changed to 2/3)
         if threshold == prev:
             break
         prev = threshold
         P = _cartesian_product(*Cs) # shape: (s**n, n) where n can be 2 or 3
-        volume = sdf(P).reshape(tuple([len(X) for X in Cs])) # (s, s, s) or (s, s)
-        where = np.argwhere(np.abs(volume) <= threshold)
+        volume = sdf(tu.to_torch(P)).reshape(tuple([len(X) for X in Cs])) # (s, s, s) or (s, s)
+        where = np.argwhere(np.abs(volume.numpy()) <= threshold+1)
 
         c1 = c0 + where.max(axis=0) * d + d / 2
         c0 = c0 + where.min(axis=0) * d - d / 2
-
+    print(c0, c1)
     return c0, c1
 
 def _worker(sdf, job, sparse):
@@ -54,14 +54,13 @@ def _worker(sdf, job, sparse):
     # (samples batches from job in the sdf according to sparse)
     n = sdf.dim
     def _marching_cubes(volume, level=0):
-        "volume"
         verts, faces, _, _ = measure.marching_cubes(volume, level)
         return verts[faces].reshape((-1, 3))
 
     def _marching_squares(volume:np.ndarray, level=0):
         contours = measure.find_contours(volume, level)
         return np.concatenate(contours, axis=0)
-        # return np.argwhere(volume <= level)
+        # return np.argwhere(volume <= 1e0)
 
     _marching = _marching_cubes if n == 3 else _marching_squares
 
@@ -72,13 +71,13 @@ def _worker(sdf, job, sparse):
         x1 = np.array([X[-1] for X in job])
         x = (x0 + x1).reshape(1, -1) / 2
         # sdf value in the center of the cube
-        r = abs(sdf(x).reshape(-1)[0]) # how far is the center from the 0 level-set
+        r = abs(sdf(tu.to_torch(x)).reshape(-1)[0]) # how far is the center from the 0 level-set
         # half of the diagonal of the cube
         d = np.linalg.norm(x.reshape(-1)-x0) # how far is the cube's corner from the center
         if r <= d:
             return False
         corners = np.array(list(itertools.product(*[(_x0, _x1) for _x0, _x1 in zip(x0, x1)])))
-        values = sdf(corners).reshape(-1)
+        values = sdf(tu.to_torch(corners)).reshape(-1).numpy()
         same = np.all(values > 0) if values[0] > 0 else np.all(values < 0)
         return same
 
@@ -86,21 +85,22 @@ def _worker(sdf, job, sparse):
         return None
         # return _debug_triangles(*job)
     P = _cartesian_product(*job)
-    volume = sdf(P).reshape(tuple([len(X) for X in job]))
+    volume = sdf(tu.to_torch(P)).numpy().reshape(tuple([len(X) for X in job]))
     try:
-        points = _marching(volume)
+        points = points = _marching(volume)
     except Exception:
         return []
+
         # return _debug_triangles(*job)
     scale = np.array([X[1] - X[0] for X in job])
     offset = np.array([X[0] for X in job])
     return points * scale + offset
 
 def generate(
-        sdf,
-        step=None, bounds=None, samples=SAMPLES,
-        workers=WORKERS, batch_size=BATCH_SIZE,
-        verbose=True, sparse=True):
+    sdf,
+    step=None, bounds=None, samples=SAMPLES,
+    workers=WORKERS, batch_size=BATCH_SIZE,
+    verbose=True, sparse=True):
     "Generate a mesh from a signed distance function in batched fashion."
     "returns a list of sorted 3d points where every 3 points form a triangle"
     "np.array(points, dtype='float32').reshape((-1, 3, 3)) can be used to get triangles"
@@ -115,6 +115,7 @@ def generate(
     if step is None:
         volume = np.prod(x1 - x0)
         step = (volume / (samples**n)) ** (1 / n)
+        # step = ((x1 - x0) / samples) ** (1 / n)
 
     dx = np.zeros(n) # dx: step size (3,)
     dx[:] = step
@@ -125,9 +126,9 @@ def generate(
         print('step', *dx, sep=' ')
 
     X = [np.arange(x0_, x1_, dx_) for x0_, x1_, dx_ in zip(x0, x1, dx)]
-
+    # X = [np.linspace(x0_, x1_, num) for x0_, x1_, dx_, num in zip(x0, x1, dx, (x1 - x0) // step)]
     # we need only one batch for 2D, so we find only one contour
-    s = batch_size if n ==3 else len(X[0])
+    s = batch_size if n==3 else len(X[0])
     Xs = [[X_t[i:i+s+1] for i in range(0, len(X_t), s)] for X_t in X]
 
     batches = list(itertools.product(*Xs))
@@ -194,7 +195,7 @@ def plot(path=None, *args, **kwargs):
     sdf = args[0]
     n = sdf.dim
     bounds = _estimate_bounds(sdf)
-    points, seconds = generate(*args, **kwargs)
+    points, seconds = generate(*args, **kwargs, bounds=bounds)
 
     if n ==3:
         mesh = Poly3DCollection(np.array(points).reshape(-1, 3, 3))
@@ -220,8 +221,8 @@ def plot(path=None, *args, **kwargs):
 # Plot Slice
 # --------------------------------------------------------------------
 def sample_slice(
-        sdf, w=1024, h=1024,
-        x=None, y=None, z=None, bounds=None):
+    sdf, w=1024, h=1024,
+    x=None, y=None, z=None, bounds=None):
 
     if bounds is None:
         bounds = _estimate_bounds(sdf)
@@ -249,7 +250,7 @@ def sample_slice(
         raise Exception('x, y, or z position must be specified')
 
     P = _cartesian_product(X, Y, Z)
-    return sdf(P).reshape((w, h)), extent, axes
+    return sdf(tu.to_torch(P)).reshape((w, h)), extent, axes
 
 def show_slice(*args, **kwargs):
     import matplotlib.pyplot as plt

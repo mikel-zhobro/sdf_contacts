@@ -1,15 +1,16 @@
 import functools
+import math
 import numpy as np
 from typing import Callable
 import operator
-
-from . import dn, d3, ease, mesh
+import torch
+from . import dn, d3, ease, mesh, torch_util as tu
 # Constants
 
-ORIGIN = np.array((0, 0))
+ORIGIN = torch.tensor((0,0), device=tu.device)
 
-X = np.array((1, 0))
-Y = np.array((0, 1))
+X = torch.tensor((1,0), device=tu.device)
+Y = torch.tensor((0,1), device=tu.device)
 
 UP = Y
 
@@ -91,34 +92,34 @@ def op23(f: SDF2):
 
 # Helpers
 
+
+
 def _length(a):
-    return np.linalg.norm(a, axis=1)
+    return torch.linalg.norm(a, dim=1)
 
 def _normalize(a):
-    return a / np.linalg.norm(a)
+    return a / torch.norm(a)
 
 def _dot(a, b):
-    return np.sum(a * b, axis=1)
+    return (a * b).sum(1)
 
-def _vec(*arrs):
-    return np.stack(arrs, axis=-1)
-
-_min = np.minimum
-_max = np.maximum
+_vec = tu.vec
+_min = tu.torch_min
+_max = tu.torch_max
 
 # Primitives
 
 @sdf2
 def circle(radius=1, center=ORIGIN):
     def f(p):
-        return _length(p - center) - radius
+        return _length(p - tu.to_torch(center)) - radius
     return f
 
 @sdf2
 def line(normal=UP, point=ORIGIN):
     normal = _normalize(normal)
     def f(p):
-        return np.dot(point - p, normal)
+        return torch.mv(tu.to_torch(point) - p, tu.to_torch(normal))
     return f
 
 @sdf2
@@ -137,15 +138,15 @@ def slab(x0=None, y0=None, x1=None, y1=None, k=None):
 @sdf2
 def rectangle(size=1, center=ORIGIN, a=None, b=None):
     if a is not None and b is not None:
-        a = np.array(a)
-        b = np.array(b)
+        a = tu.to_torch(a)
+        b = tu.to_torch(b)
         size = b - a
         center = a + size / 2
         return rectangle(size, center)
-    size = np.array(size)
+    size = tu.to_torch(size)
     def f(p):
-        q = np.abs(p - center) - size / 2
-        return _length(_max(q, 0)) + _min(np.amax(q, axis=1), 0)
+        q = (p - center).abs() - size
+        return _length(_max(q, 0)) + _min(q.amax(1), 0)
     return f
 
 @sdf2
@@ -157,12 +158,12 @@ def rounded_rectangle(size, radius, center=ORIGIN):
     def f(p):
         x = p[:,0]
         y = p[:,1]
-        r = np.zeros(len(p)).reshape((-1, 1))
-        r[np.logical_and(x > 0, y > 0)] = r0
-        r[np.logical_and(x > 0, y <= 0)] = r1
-        r[np.logical_and(x <= 0, y <= 0)] = r2
-        r[np.logical_and(x <= 0, y > 0)] = r3
-        q = np.abs(p) - size / 2 + r
+        r = torch.zeros_like(x)
+        r[torch.logical_and(x > 0, y > 0)] = r0
+        r[torch.logical_and(x > 0, y <= 0)] = r1
+        r[torch.logical_and(x <= 0, y <= 0)] = r2
+        r[torch.logical_and(x <= 0, y > 0)] = r3
+        q = p.abs() - tu.to_torch(size / 2 + r)
         return (
             _min(_max(q[:,0], q[:,1]), 0).reshape((-1, 1)) +
             _length(_max(q, 0)).reshape((-1, 1)) - r)
@@ -172,62 +173,58 @@ def rounded_rectangle(size, radius, center=ORIGIN):
 def equilateral_triangle():
     def f(p):
         k = 3 ** 0.5
-        p = _vec(
-            np.abs(p[:,0]) - 1,
-            p[:,1] + 1 / k)
+        p = _vec(p[:, 0].abs() - 1, p[:, 1] + 1 / k)
         w = p[:,0] + k * p[:,1] > 0
         q = _vec(
             p[:,0] - k * p[:,1],
             -k * p[:,0] - p[:,1]) / 2
-        p = np.where(w.reshape((-1, 1)), q, p)
-        p = _vec(
-            p[:,0] - np.clip(p[:,0], -2, 0),
-            p[:,1])
-        return -_length(p) * np.sign(p[:,1])
+        p = torch.where(w.reshape((-1, 1)), q, p)
+        p = _vec(p[:, 0] - p[:, 0].clamp(-2, 0), p[:, 1])
+        return -_length(p) * torch.sign(p[:,1])
     return f
 
 @sdf2
 def hexagon(r):
     r *= 3 ** 0.5 / 2
     def f(p):
-        k = np.array((3 ** 0.5 / -2, 0.5, np.tan(np.pi / 6)))
-        p = np.abs(p)
+        r_torch = tu.to_torch(r)
+        k = tu.to_torch([3 ** 0.5 / -2, 0.5, math.tan(math.pi / 6)])
+        p = p.abs()
         p -= 2 * k[:2] * _min(_dot(k[:2], p), 0).reshape((-1, 1))
-        p -= _vec(
-            np.clip(p[:,0], -k[2] * r, k[2] * r),
-            np.zeros(len(p)) + r)
-        return _length(p) * np.sign(p[:,1])
+        p -= _vec(p[:,0].clamp(-k[2] * r_torch, k[2] * r_torch),torch.zeros_like(p[:,0]) + r_torch)
+        return _length(p) * torch.sign(p[:,1])
     return f
 
 @sdf2
 def rounded_x(w, r):
     def f(p):
-        p = np.abs(p)
+        w, r = tu.to_torch(w, r)
+        p = p.abs()
         q = (_min(p[:,0] + p[:,1], w) * 0.5).reshape((-1, 1))
         return _length(p - q) - r
     return f
 
 @sdf2
-def polygon(points):
-    points = [np.array(p) for p in points]
+def polygon(points): # TODO: fix
+    points = [tu.to_torch(point) for point in points]
     def f(p):
         n = len(points)
         d = _dot(p - points[0], p - points[0])
-        s = np.ones(len(p))
+        s = torch.ones_like(p[:, 0])
         for i in range(n):
             j = (i + n - 1) % n
             vi = points[i]
             vj = points[j]
             e = vj - vi
             w = p - vi
-            b = w - e * np.clip(np.dot(w, e) / np.dot(e, e), 0, 1).reshape((-1, 1))
+            b = w - e * (torch.mv(w, e) / torch.dot(e, e)).clamp(0, 1).reshape((-1, 1))
             d = _min(d, _dot(b, b))
             c1 = p[:,1] >= vi[1]
             c2 = p[:,1] < vj[1]
             c3 = e[0] * w[:,1] > e[1] * w[:,0]
             c = _vec(c1, c2, c3)
-            s = np.where(np.all(c, axis=1) | np.all(~c, axis=1), -s, s)
-        return s * np.sqrt(d)
+            s = torch.where(torch.all(c, axis=1) | torch.all(~c, axis=1), -s, s)
+        return s * d.sqrt()
     return f
 
 # Positioning
@@ -235,7 +232,7 @@ def polygon(points):
 @op2
 def translate(other, offset):
     def f(p):
-        return other(p - offset)
+        return other(p - tu.to_torch(offset))
     return f
 
 @op2
@@ -247,25 +244,24 @@ def scale(other, factor):
     s = (x, y)
     m = min(x, y)
     def f(p):
-        return other(p / s) * m
+        return other(p / tu.to_torch(s)) * tu.to_torch(m)
     return f
 
 @op2
 def rotate(other, angle):
-    s = np.sin(angle)
-    c = np.cos(angle)
-    m = 1 - c
-    matrix = np.array([
-        [c, -s],
-        [s, c],
-    ]).T
+    s = math.sin(angle)
+    c = math.cos(angle)
+    matrix = tu.to_torch([
+        [c, s],
+        [-s, c],
+    ])
     def f(p):
-        return other(np.dot(p, matrix))
+        return other(p@matrix)
     return f
 
 @op2
 def circular_array(other, count):
-    angles = [i / count * 2 * np.pi for i in range(count)]
+    angles = [i / count * 2 * math.pi for i in range(count)]
     return union(*[other.rotate(a) for a in angles])
 
 # Alterations
@@ -273,7 +269,7 @@ def circular_array(other, count):
 @op2
 def elongate(other, size):
     def f(p):
-        q = np.abs(p) - size
+        q = p.abs() - tu.to_torch(size)
         x = q[:,0].reshape((-1, 1))
         y = q[:,1].reshape((-1, 1))
         w = _min(_max(x, y), 0)
@@ -286,7 +282,7 @@ def elongate(other, size):
 def extrude(other, h):
     def f(p):
         d = other(p[:,[0,1]])
-        w = _vec(d.reshape(-1), np.abs(p[:,2]) - h / 2)
+        w = _vec(d.reshape(-1), p[:, 2].abs() - h / 2)
         return _min(_max(w[:,0], w[:,1]), 0) + _length(_max(w, 0))
     return f
 
@@ -295,9 +291,9 @@ def extrude_to(a, b, h, e=ease.linear):
     def f(p):
         d1 = a(p[:,[0,1]])
         d2 = b(p[:,[0,1]])
-        t = e(np.clip(p[:,2] / h, -0.5, 0.5) + 0.5)
+        t = e((p[:, 2] / h).clamp(-0.5, 0.5) + 0.5)
         d = d1 + (d2 - d1) * t.reshape((-1, 1))
-        w = _vec(d.reshape(-1), np.abs(p[:,2]) - h / 2)
+        w = _vec(d.reshape(-1), p[:, 2].abs() - h / 2)
         return _min(_max(w[:,0], w[:,1]), 0) + _length(_max(w, 0))
     return f
 
