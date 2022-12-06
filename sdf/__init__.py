@@ -18,7 +18,8 @@ from .mesh import (
     show_slice,
     plot,
     estimate_bounds,
-    cartesian_product
+    cartesian_product,
+    _worker
 
 )
 

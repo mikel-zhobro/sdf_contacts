@@ -9,8 +9,8 @@ from . import dn, d3, ease, mesh, torch_util as tu
 
 ORIGIN = torch.tensor((0,0), device=tu.device)
 
-X = torch.tensor((1,0), device=tu.device)
-Y = torch.tensor((0,1), device=tu.device)
+X = torch.tensor((1.,0.), device=tu.device)
+Y = torch.tensor((0.,1.), device=tu.device)
 
 UP = Y
 
@@ -143,7 +143,7 @@ def rectangle(size=1, center=ORIGIN, a=None, b=None):
         size = b - a
         center = a + size / 2
         return rectangle(size, center)
-    size = tu.to_torch(size)
+    size, center = tu.to_torch(size, center)
     def f(p):
         q = (p - center).abs() - size
         return _length(_max(q, 0)) + _min(q.amax(1), 0)
