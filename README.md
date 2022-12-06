@@ -1,6 +1,6 @@
 # sdf-torch
 
-This is a fork of [fogleman/sdf](https://github.com/fogleman/sdf) that uses PyTorch instead of numpy for batched computation. I was curious if a GPU could greatly speed up SDF evaluation. Initial benchmarks show that torch+GPU can give a significant speedup over numpy+CPU, and even torch+CPU gives a (smaller) speedup.
+This is a fork of [fogleman/sdf](https://github.com/fogleman/sdf) that uses PyTorch instead of numpy for batched computation.
 
 Here are some timings from a few example scripts(for samples=2**8):
 
@@ -16,8 +16,8 @@ Here are some timings from a few example scripts(for samples=2**8):
 | image      | 13.358s  | 3.363s     |     0s     |  
 | example    | 8.445s   | 2.381s     |     0s     |  
 
-
-**Benchmark hardware:** one `Titan X (Pascal)` and an 8 hypercore `Intel(R) Core(TM) i7-6700K CPU @ 4.00GHz`.
+## Contact detection
+Some examples for contact detection and their visualiztion can be  found in [play.py](play.py) and [play3d.py](play3d.py).
 
 # Old README
 Generate 3D meshes based on SDFs (signed distance functions) with a

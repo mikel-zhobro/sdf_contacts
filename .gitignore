@@ -2,3 +2,5 @@
 *.stl
 *.pyc
 *.obj
+*.png
+*.pdf
