@@ -1,4 +1,4 @@
-# sdf-torch
+# sdf-torch (private)
 
 This is a fork of [fogleman/sdf](https://github.com/fogleman/sdf) that uses PyTorch instead of numpy for batched computation.
 
