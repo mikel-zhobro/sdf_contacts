@@ -6,11 +6,16 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import time
 
+
+def unique(tensor1d):
+    _, idx = np.unique(tensor1d.numpy(), return_inverse=True)
+    return torch.from_numpy(idx)
+
 def obj(sdf1: torch.Tensor, sdf2: torch.Tensor, lamda: torch.Tensor=None):
-    return sdf1 + sdf2 + (sdf1 - sdf2)**2#.abs()
+    return sdf1 + sdf2 + (sdf1 - sdf2)**2
 
 
-def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, lamda=None):
+def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=300):
     # Get sample-set
     x_min, x_max = estimate_bounds(sdf_func1 | sdf_func2)
     Xs = [np.linspace(x0, x1, 40) for x0, x1 in zip(x_min, x_max)]
@@ -21,8 +26,7 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, lamda=None):
 
     # Prepare optimization variables
     x_min, x_max = tu.to_torch(x_min, x_max)
-    N_init = 300
-    cand_pts_init =  x_min + torch.rand(N_init, 3) * (x_max - x_min)
+    cand_pts_init =  x_min + torch.rand(n_cand, 3) * (x_max - x_min)
     cand_pts = cand_pts_init.clone().requires_grad_(True)
 
     opt = torch.optim.SGD([cand_pts], lr=lr)
@@ -51,11 +55,17 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, lamda=None):
         # Log
         l = loss.item()
         constr = sum((sdfs1 - sdfs2).abs()).item()
-        print(f"{i}: {l :.3f} | {constr :.3f} ({{time.time() - start}})")# | {lamda.mean().item() :.3f} | {lamda.std().item() :.3f}")
+        print(f"{i}: {l :.3f} | {constr :.3f} ({time.time() - start})")# | {lamda.mean().item() :.3f} | {lamda.std().item() :.3f}")
 
+
+    # Extra stuff to present the results
     cand_pts = cand_pts.detach().numpy()
 
+    # Get unique points from cand_pts (N, 3) -- also possible to use distances from (0,0,0) instead of pointwise comparison
+    unique_points = np.unique(np.round(cand_pts, decimals=3), axis=0)
+    n_unique = len(unique_points)
 
+    print("We have {} unique points".format(n_unique))
 
     fig = plt.figure()
     ax = fig.add_subplot(projection=f'{3}d')
@@ -65,16 +75,19 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, lamda=None):
         points = mesh._worker(sdf, Xs, True)
         mymesh = Poly3DCollection(np.array(points).reshape(-1, 3, 3))
         mymesh.set_facecolor(cols.pop())
-        mymesh.set_alpha(0.3)
+        mymesh.set_alpha(0.2)
         ax.add_collection3d(mymesh)
 
-    ax.scatter(cand_pts_init[:, 0], cand_pts_init[:, 1], cand_pts_init[:, 2], c='r')
-    ax.scatter(cand_pts[:, 0], cand_pts[:, 1], cand_pts[:, 2], c='k')
+    ax.scatter(cand_pts_init[:, 0], cand_pts_init[:, 1], cand_pts_init[:, 2], c='r', alpha=0.3, s=7, label=f'the {n_cand} initial points')
+    ax.scatter(cand_pts[:, 0], cand_pts[:, 1], cand_pts[:, 2], c='b', alpha=0.3, s=7, label='candidate points')
+    ax.scatter(unique_points[:, 0], unique_points[:, 1], unique_points[:, 2], c='k', marker='x',s=42, label=f'the {n_unique} unique points')
     ax.set_xlim(left=x_min[0], right=x_max[0])
     ax.set_ylim(bottom=x_min[1], top=x_max[1])
     ax.set_zlim(x_min[2], x_max[2])
     ax.set_aspect('equal')
 
+    plt.suptitle("3D-SDF contact detection")
+    plt.legend()
     plt.show()
 
 
@@ -108,4 +121,5 @@ def pair6():
     return d3.box(size=(2., 5., 5)), d3.box(center=(2., 0., 0.), size=2.) & d3.capped_cylinder(1, 2, 0.5)
 
 if __name__ == "__main__":
-    main(*pair6(), 190, 1e-1)
+    main(*pair4(), 190, 1e-1, n_cand=300)
+

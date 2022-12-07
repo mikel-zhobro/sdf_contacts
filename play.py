@@ -7,7 +7,7 @@ name = 'test'
 def obj(sdf1: torch.Tensor, sdf2: torch.Tensor, lamda: torch.Tensor=None):
     return sdf1 + sdf2 + (sdf1 - sdf2)**2#.abs()
 
-def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, lamda=None):
+def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=100, ):
     # Get sample-set
     x_min, x_max = estimate_bounds(sdf_func1 | sdf_func2)
     Xs = np.linspace(x_min[0], x_max[0], 100)
@@ -19,8 +19,7 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, lamda=None):
 
     # Prepare optimization variables
     x_min, x_max = tu.to_torch(x_min, x_max)
-    N_init = 100
-    cand_pts_init =  x_min + torch.rand(N_init, 2) * (x_max - x_min)
+    cand_pts_init =  x_min + torch.rand(n_cand, 2) * (x_max - x_min)
     cand_pts = cand_pts_init.clone().requires_grad_(True)
 
     opt = torch.optim.SGD([cand_pts], lr=lr)
@@ -49,6 +48,17 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, lamda=None):
         l = loss.item()
         constr = sum((sdfs1 - sdfs2).abs()).item()
         print(f"{l :.3f} | {constr :.3f}")# | {lamda.mean().item() :.3f} | {lamda.std().item() :.3f}")
+
+
+    # Extra stuff to present the results
+    cand_pts = cand_pts.detach().numpy()
+
+
+    # Get unique points from cand_pts (N, 2) -- also possible to use distances from (0,0,0) instead of pointwise comparison
+    unique_points = np.unique(np.round(cand_pts, decimals=3), axis=0)
+    n_unique = len(unique_points)
+
+    print("We have {} unique points".format(n_unique))
 
 
     # VISUALIZE
@@ -101,25 +111,25 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, lamda=None):
 
     # Objective
     ax5.set_title("Objective: SDF1+SDF2 + (SDF1-SDF2)^2")
-    ax5.imshow (my_obj.T, cmap, extent=extent, origin='lower', vmin=-VMAX, vmax=VMAX)
+    ax5.imshow (my_obj.T, cmap, extent=extent, origin='lower', vmin=-VMAX, vmax=VMAX, alpha=0.7)
     ax5.contour(X, Y, sdf1_grid, [0], colors='k')#, extent=extent)
     ax5.contour(X, Y, sdf2_grid, [0], colors='k')#, extent=extent)
     ax5.contour(X, Y, my_obj, [-2, -1, 0, 1, 2], extent=extent)
-    ax5.scatter(cand_pts_init[:, 0].detach(), cand_pts_init[:, 1].detach(), color = 'red')
-    ax5.scatter(cand_pts[:, 0].detach(), cand_pts[:, 1].detach(), color='blue')
-    # ax[0][1].scatter(P[:, 0].detach(), P[:, 1].detach(), color='gray', marker='x')
+    ax5.scatter(cand_pts_init[:, 0], cand_pts_init[:, 1], c='r', s=7, label=f'the {n_cand} initial points')
+    ax5.scatter(cand_pts[:, 0], cand_pts[:, 1], c='b', s=7, label='candidate points')
+    ax5.scatter(unique_points[:, 0], unique_points[:, 1], c='k', marker='x', s=42, label=f'the {n_unique} unique points')
+
+    plt.suptitle("2D-SDF contact detection")
+    plt.legend()
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.plot_surface(X, Y, my_obj, cmap=cmap, alpha=0.5, vmin=-VMAX, vmax=VMAX)
-    ax.scatter(cand_pts[:, 0].detach(), cand_pts[:, 1].detach(), obj(sdf_func1(cand_pts), sdf_func2(cand_pts)).detach().numpy())
+    ax.scatter(cand_pts[:, 0], cand_pts[:, 1], obj(sdfs1, sdfs2).detach().numpy())
     ax.set_title("Objective: SDF1+SDF2 + (SDF1-SDF2)^2")
     plt.tight_layout()
     plt.show()
-    # plt.savefig("SDF-SDF-contact.pdf")
 
-    # print("P1 mean: {}, var: {}".format(p1.mean(dim=1), p1.var(dim=1)))
-    # print("P2 mean: {}, var: {}".format(p2.mean(dim=1), p2.var(dim=1)))
 
 if __name__ == "__main__":
     sdf_func1 = circle(1., center=[0.,2.])
@@ -130,7 +140,7 @@ if __name__ == "__main__":
 
 
 
-    main(sdf_func2, sdf_func3, max_iter=500)
+    main(sdf_func2, sdf_func3, max_iter=120, lr=0.1, n_cand=100)
 
 
 
