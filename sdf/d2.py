@@ -1,10 +1,10 @@
 import functools
 import math
-import numpy as np
 from typing import Callable
-import operator
 import torch
 from . import dn, d3, ease, mesh, torch_util as tu
+
+
 # Constants
 
 ORIGIN = torch.tensor((0,0), device=tu.device)
@@ -49,6 +49,7 @@ class SDF2:
     def translate(self, offset): return translate(self, offset)
     def scale(self, factor): return scale(self, factor)
     def rotate(self, angle): return rotate(self, angle)
+    def rotate_tensor(self, angle): return rotate_tensor(self, angle)
     def circular_array(self, count): return circular_array(self, count)
     def elongate(self, size): return elongate(self, size)
 
@@ -90,10 +91,9 @@ def op23(f: SDF2):
     _ops[f.__name__] = wrapper
     return wrapper
 
+# ----------------------------------------------------------------
 # Helpers
-
-
-
+# ----------------------------------------------------------------
 def _length(a):
     return torch.linalg.norm(a, dim=1)
 
@@ -107,8 +107,9 @@ _vec = tu.vec
 _min = tu.torch_min
 _max = tu.torch_max
 
+# ----------------------------------------------------------------
 # Primitives
-
+# ----------------------------------------------------------------
 @sdf2
 def circle(radius=1, center=ORIGIN):
     def f(p):
@@ -117,9 +118,11 @@ def circle(radius=1, center=ORIGIN):
 
 @sdf2
 def line(normal=UP, point=ORIGIN):
-    normal = _normalize(normal)
+    _normal = _normalize(tu.to_torch(normal))
+    _point = tu.to_torch(point)
+
     def f(p):
-        return torch.mv(tu.to_torch(point) - p, tu.to_torch(normal))
+        return torch.mv(p - _point, _normal)
     return f
 
 @sdf2
@@ -155,6 +158,8 @@ def rounded_rectangle(size, radius, center=ORIGIN):
         r0, r1, r2, r3 = radius
     except TypeError:
         r0 = r1 = r2 = r3 = radius
+
+    _size, _center = tu.to_torch(size, center)
     def f(p):
         x = p[:,0]
         y = p[:,1]
@@ -163,10 +168,10 @@ def rounded_rectangle(size, radius, center=ORIGIN):
         r[torch.logical_and(x > 0, y <= 0)] = r1
         r[torch.logical_and(x <= 0, y <= 0)] = r2
         r[torch.logical_and(x <= 0, y > 0)] = r3
-        q = p.abs() - tu.to_torch(size / 2 + r)
+        q = p.abs() - _size / 2 + r[:, None]
         return (
             _min(_max(q[:,0], q[:,1]), 0).reshape((-1, 1)) +
-            _length(_max(q, 0)).reshape((-1, 1)) - r)
+            _length(_max(q, 0)).reshape((-1, 1)) - r[:, None])
     return f
 
 @sdf2
@@ -227,12 +232,36 @@ def polygon(points): # TODO: fix
         return s * d.sqrt()
     return f
 
+# ----------------------------------------------------------------
 # Positioning
-
+# ----------------------------------------------------------------
 @op2
 def translate(other, offset):
     def f(p):
         return other(p - tu.to_torch(offset))
+    return f
+
+@op2
+def rotate(other, angle):
+    s = math.sin(angle)
+    c = math.cos(angle)
+    matrix = tu.to_torch([
+        [c, -s],
+        [s, c],
+    ])
+    def f(p):
+        return other(p@matrix)
+    return f
+
+@op2
+def rotate_tensor(other, angle):
+    _angle = tu.to_torch(angle)
+    s = torch.sin(_angle)
+    c = torch.cos(_angle)
+    rot = torch.stack([torch.stack([c, -s]),
+                       torch.stack([s, c])])
+    def f(p):
+        return other(p@rot)
     return f
 
 @op2
@@ -247,25 +276,16 @@ def scale(other, factor):
         return other(p / tu.to_torch(s)) * tu.to_torch(m)
     return f
 
-@op2
-def rotate(other, angle):
-    s = math.sin(angle)
-    c = math.cos(angle)
-    matrix = tu.to_torch([
-        [c, s],
-        [-s, c],
-    ])
-    def f(p):
-        return other(p@matrix)
-    return f
+
 
 @op2
 def circular_array(other, count):
     angles = [i / count * 2 * math.pi for i in range(count)]
     return union(*[other.rotate(a) for a in angles])
 
+# ----------------------------------------------------------------
 # Alterations
-
+# ----------------------------------------------------------------
 @op2
 def elongate(other, size):
     def f(p):
@@ -276,8 +296,9 @@ def elongate(other, size):
         return other(_max(q, 0)) + w
     return f
 
+# ----------------------------------------------------------------
 # 2D => 3D Operations
-
+# ----------------------------------------------------------------
 @op23
 def extrude(other, h):
     def f(p):
@@ -305,8 +326,9 @@ def revolve(other, offset=0):
         return other(q)
     return f
 
+# ----------------------------------------------------------------
 # Common
-
+# ----------------------------------------------------------------
 union = op2(dn.union)
 difference = op2(dn.difference)
 intersection = op2(dn.intersection)

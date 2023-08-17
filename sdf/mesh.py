@@ -34,18 +34,25 @@ def estimate_bounds(sdf, verbose=True):
     c1 = np.zeros(n) + 1e9 #
     prev = None
     for i in range(32):
-        Cs = [np.linspace(x0, x1, s) for x0, x1 in zip(c0, c1)] # linspace for each dimension - (s,s,s) cubes
+        Cs = [np.linspace(x0, x1, s) for x0, x1 in zip(c0, c1)] # linspace for each dimension - (s,s,s) cubes [dim, s]
         d = np.array([X[1] - X[0] for X in Cs]) # the diagonal of one of the (s,s,s) cubes
         threshold = np.linalg.norm(d) * 2 /3 # closer than the half of the diagonal is considered inside (changed to 2/3)
+        threshold = np.abs(d).mean() * 2 /3 # closer than the half of the diagonal is considered inside (changed to 2/3)
         if threshold == prev:
             break
         prev = threshold
-        P = cartesian_product(*Cs) # shape: (s**n, n) where n can be 2 or 3
+        P = cartesian_product(*Cs) # shape: (s**n, n) where n can be 2 or 3 -- kind of meshgrid
         volume = sdf(tu.to_torch(P)).reshape(tuple([len(X) for X in Cs])) # (s, s, s) or (s, s)
-        where = np.argwhere(np.abs(volume.numpy()) <= threshold+1)
+        where = np.argwhere(np.abs(volume.numpy()) <= threshold)
 
         c1 = c0 + where.max(axis=0) * d + d / 2
         c0 = c0 + where.min(axis=0) * d - d / 2
+
+        print(f"min/max coord: {where.max(axis=0)}, {where.min(axis=0)}")
+        print(f"iteration {i} - threshold: {threshold} - c0: {c0} - c1: {c1}")
+    # explain this function:
+    #
+
     if verbose:
         print(c0, c1)
     return c0, c1

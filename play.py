@@ -1,70 +1,27 @@
 import torch
 import matplotlib.pyplot as plt
+import numpy as np
+
+
 from sdf import *
 
 name = 'test'
 
-def obj(sdf1: torch.Tensor, sdf2: torch.Tensor, lamda: torch.Tensor=None):
-    return sdf1 + sdf2 + (sdf1 - sdf2)**2#.abs()
 
-def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=100, ):
-    # Get sample-set
-    x_min, x_max = estimate_bounds(sdf_func1 | sdf_func2)
+def visualize(cand_pts_init, cand_pts, unique_points, sdf_func1, sdf_func2, obj, x_min, x_max):
+    n_cand = cand_pts.shape[0]
+    n_unique = unique_points.shape[0]
+    # VISUALIZE
+    cmap = plt.get_cmap('seismic')
+    VMAX = 20
+
+    # Prepare grid-mesh for vizualization
     Xs = np.linspace(x_min[0], x_max[0], 100)
     Ys = np.linspace(x_min[1], x_max[1], 200)
     Xs = [Xs, Ys]
     shape = [len(X) for X in Xs]
-    P = cartesian_product(*Xs)
-    P = tu.to_torch(P)
+    P = tu.to_torch(cartesian_product(*Xs))
 
-    # Prepare optimization variables
-    x_min, x_max = tu.to_torch(x_min, x_max)
-    cand_pts_init =  x_min + torch.rand(n_cand, 2) * (x_max - x_min)
-    cand_pts = cand_pts_init.clone().requires_grad_(True)
-
-    opt = torch.optim.SGD([cand_pts], lr=lr)
-
-    for i in range(max_iter):
-        opt.zero_grad()
-        sdfs1 = sdf_func1(cand_pts)
-        sdfs2 = sdf_func2(cand_pts)
-        sdf_vec = obj(sdfs1, sdfs2)
-
-        loss = torch.sum(sdf_vec)
-        loss.backward()
-        opt.step()
-        # with torch.no_grad():
-            # lamda += lr * torch.sum(sdfs1 - sdfs2)
-            # cand_pts -= lr * cand_pts.grad
-            # lamda    += lr*3 * (sdfs1 - sdfs2).abs()
-        # dx, dl = torch.autograd.grad(loss, [cand_pts, lamda])
-        # with torch.no_grad():
-            # cand_pts -= 1e-5 * dx
-            # lamda += 1e-4 * (sdfs1 - sdfs2)
-        # if i % 100 == 0:
-        #     lamda = lamda+ 0.13
-
-        # Log
-        l = loss.item()
-        constr = sum((sdfs1 - sdfs2).abs()).item()
-        print(f"{l :.3f} | {constr :.3f}")# | {lamda.mean().item() :.3f} | {lamda.std().item() :.3f}")
-
-
-    # Extra stuff to present the results
-    cand_pts = cand_pts.detach().numpy()
-
-
-    # Get unique points from cand_pts (N, 2) -- also possible to use distances from (0,0,0) instead of pointwise comparison
-    unique_points = np.unique(np.round(cand_pts, decimals=3), axis=0)
-    n_unique = len(unique_points)
-
-    print("We have {} unique points".format(n_unique))
-
-
-    # VISUALIZE
-    cmap = plt.get_cmap('seismic')
-    VMAX = 20
-    # Prepare grid-mesh for vizualization
     sdf1_vals = sdf_func1(P)
     sdf2_vals = sdf_func2(P)
     my_obj = obj(sdf1_vals, sdf2_vals).detach().numpy().reshape(shape)
@@ -125,22 +82,103 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=100, ):
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.plot_surface(X, Y, my_obj, cmap=cmap, alpha=0.5, vmin=-VMAX, vmax=VMAX)
-    ax.scatter(cand_pts[:, 0], cand_pts[:, 1], obj(sdfs1, sdfs2).detach().numpy())
+    ax.scatter(cand_pts[:, 0], cand_pts[:, 1], obj(sdf_func1(tu.to_torch(cand_pts)), sdf_func2(tu.to_torch(cand_pts))).detach().numpy())
     ax.set_title("Objective: SDF1+SDF2 + (SDF1-SDF2)^2")
     plt.tight_layout()
     plt.show()
 
 
+def find_contact(sdf_func1, sdf_func2, cand_pts_init: torch.Tensor, max_iter=1000, lr=1e-2, n_cand=100, ):
+
+    cand_pts = cand_pts_init.clone().requires_grad_(True)
+
+    opt = torch.optim.SGD([cand_pts], lr=lr)
+
+    for i in range(max_iter):
+        opt.zero_grad()
+        sdfs1 = sdf_func1(cand_pts)
+        sdfs2 = sdf_func2(cand_pts)
+        sdf_vec = obj(sdfs1, sdfs2)
+
+        loss = torch.sum(sdf_vec)
+        loss.backward()
+        opt.step()
+
+        # Log
+        l = loss.item()
+        constr = sum((sdfs1 - sdfs2).abs()).item()
+        print(f"{i}:{l :.3f} | {constr :.3f}")# | {lamda.mean().item() :.3f} | {lamda.std().item() :.3f}")
+
+    return cand_pts
+
+def obj(sdf1: torch.Tensor, sdf2: torch.Tensor):
+    return sdf1 + sdf2 + (sdf1 - sdf2)**2 #.abs()
+
+
+
+def estimate_bounds2_0(sdf, min=-10., max=10, verbose=True):
+    """
+    ------ Estimate bounds of the sdf (dimension agnostic) ------
+    starts with a small cube and expands it until sdf is contained
+    it does that by expanding the bounds using sdf values from previous sampled bounds
+    """
+    n = sdf.dim
+    s = 16
+    c0 = np.zeros(n) - max #
+    c1 = np.zeros(n) + max #
+    prev = None
+    print(f"iteration {0} - c0: {c0} - c1: {c1}")
+    for i in range(1):
+        Cs = [np.linspace(x0, x1, s) for x0, x1 in zip(c0, c1)] # linspace for each dimension - (s,s,s) cubes [dim, s]
+        d = np.abs(np.array([X[1] - X[0] for X in Cs])) # the diagonal of one of the (s,s,s) cubes
+
+        P = tu.to_torch(cartesian_product(*Cs)).requires_grad_() # shape: (s**n, n) where n can be 2 or 3 -- kind of meshgrid
+        volume: torch.Tensor = sdf(P).reshape(tuple([len(X) for X in Cs])) # (s, s, s) or (s, s)
+        volume.sum().backward()
+        assert P.grad is not None
+        vec_2_surface = np.abs(P.grad.numpy().reshape(tuple([len(X) for X in Cs]+[-1])) * volume.detach().numpy()[...,None]) # (s**n, n) * (s, s, s) = (s, s, s, n)
+
+        where = np.argwhere(np.logical_and(vec_2_surface[:,:,0] <= d[0], vec_2_surface[:,:,1] <= d[1]))
+
+        c1 = c0 + where.max(axis=0) * d + d / 2
+        c0 = c0 + where.min(axis=0) * d - d / 2
+
+        # print(f"min/max coord: {where.max(axis=0)}, {where.min(axis=0)}")
+        print(f"iteration {i} - c0: {c0} - c1: {c1}, 'd': {d} {where.min(axis=0)}, {where.max(axis=0)}")
+    # return np.where(c0 < min, min, c0), np.where(c1 > max, max, c0)
+    return np.clip(c0-d-1., min, max), np.clip(c1+d+1., min, max)
+
+
+def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=100, ):
+    # Get initial sample-set
+    x_min, x_max = estimate_bounds2_0(sdf_func1 | sdf_func2, min=(-10,-10), max=(10,10) )
+    x_min, x_max = tu.to_torch(x_min, x_max)
+    cand_pts_init =  x_min + torch.rand(n_cand, 2) * (x_max - x_min)
+
+    contact_points = find_contact(sdf_func1, sdf_func2, cand_pts_init, max_iter=max_iter, lr=lr, n_cand=n_cand)
+
+
+    # Extra stuff to present the results
+    cand_pts_np = contact_points.detach().numpy()
+
+    # Get unique points from cand_pts (N, 2) -- also possible to use distances from (0,0,0) instead of pointwise comparison
+    unique_points = np.unique(np.round(cand_pts_np, decimals=3), axis=0)
+    print("We have {} unique points".format(len(unique_points)))
+
+    visualize(cand_pts_init.detach().numpy(), cand_pts_np, unique_points, sdf_func1, sdf_func2, obj, x_min, x_max)
+
+
 if __name__ == "__main__":
-    sdf_func1 = circle(1., center=[0.,2.])
-    sdf_func2 = rectangle(1.3, center=[0.0, 4.0])
-    sdf_func2 = circle(1.1, center=[0.0, 0.0])
+    plane_sdf = line(normal=[0., 1.], point=[0., 0.])
+    sdf_func1 = circle(1., center=[0.,0.])
+    sdf_func2 = rectangle(0.3, center=[0.0, 0.0])
+    sdf_func3 = circle(1.1, center=[0.0, 0.0])
 
-    sdf_func3 = d2.equilateral_triangle().translate([2.,0]).circular_array(8)
+    sdf_func4 = d2.equilateral_triangle().translate([2.,0]).circular_array(8)
 
-
-
-    main(sdf_func2, sdf_func3, max_iter=120, lr=0.1, n_cand=100)
+    x = torch.tensor([1.0, 0.1])[None, :]
+    print(plane_sdf(x))
+    main(sdf_func2, sdf_func4, max_iter=120, lr=0.1, n_cand=100)
 
 
 

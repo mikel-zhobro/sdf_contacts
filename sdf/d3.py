@@ -1,10 +1,9 @@
 import functools
 import math
-import numpy as np
 import torch
-import operator
 from typing import Callable
 from . import dn, d2, ease, mesh, torch_util as tu
+
 
 # Constants
 
@@ -100,8 +99,9 @@ def op32(f: SDF3):
     _ops[f.__name__] = wrapper
     return wrapper
 
+# ----------------------------------------------------------------
 # Helpers
-
+# ----------------------------------------------------------------
 def _length(a):
     return torch.linalg.norm(a, dim=1)
 
@@ -123,8 +123,9 @@ _vec = tu.vec
 _min = tu.torch_min
 _max = tu.torch_max
 
+# ----------------------------------------------------------------
 # Primitives
-
+# ----------------------------------------------------------------
 @sdf3
 def sphere(radius=1, center=ORIGIN):
     def f(p):
@@ -316,8 +317,9 @@ def pyramid(h):
         return ((d2 + qz * qz) / m2).sqrt() * torch.sign(_max(qz, -py))
     return f
 
+# ----------------------------------------------------------------
 # Platonic Solids
-
+# ----------------------------------------------------------------
 @sdf3
 def tetrahedron(r):
     def f(p):
@@ -359,8 +361,9 @@ def icosahedron(r):
         return _max(_max(_max(a, b), c) - x, d) * r
     return f
 
+# ----------------------------------------------------------------
 # Positioning
-
+# ----------------------------------------------------------------
 @op3
 def translate(other, offset):
     def f(p):
@@ -426,8 +429,9 @@ def circular_array(other, count, offset=0):
         return _min(d1, d2)
     return f
 
+# ----------------------------------------------------------------
 # Alterations
-
+# ----------------------------------------------------------------
 @op3
 def elongate(other, size):
     def f(p):
@@ -535,8 +539,9 @@ def wrap_around(other, x0, x1, r=None, e=ease.linear):
         return other(q)
     return f
 
+# ----------------------------------------------------------------
 # 3D => 2D Operations
-
+# ----------------------------------------------------------------
 @op32
 def slice(other):
     # TODO: support specifying a slice plane
@@ -553,8 +558,9 @@ def slice(other):
         return A
     return f
 
+# ----------------------------------------------------------------
 # Common
-
+# ----------------------------------------------------------------
 union = op3(dn.union)
 difference = op3(dn.difference)
 intersection = op3(dn.intersection)

@@ -7,14 +7,14 @@ setup(
     author='Michael Fogleman',
     author_email='michael.fogleman@gmail.com',
     packages=['sdf'],
-    install_requires=[
-        'matplotlib',
-        'meshio',
-        'numpy',
-        'scikit-image>=0.17',
-        'scipy',
-        'Pillow',
-    ],
+    # install_requires=[
+    #     'matplotlib',
+    #     'meshio',
+    #     'numpy',
+    #     'scikit-image>=0.17',
+    #     'scipy',
+    #     'Pillow',
+    # ],
     license='MIT',
     classifiers=(
         'Development Status :: 3 - Alpha',

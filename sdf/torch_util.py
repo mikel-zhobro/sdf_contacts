@@ -2,9 +2,12 @@ from typing import Any, Union
 
 import numpy as np
 import torch
+torch.set_default_dtype(torch.float64)
+
 
 device = "cpu"
 REF_TENSOR = torch.empty(0, device=device)
+
 def to_torch(*objs: Any) -> torch.Tensor:
     if len(objs) == 1:
         return _to_torch(REF_TENSOR, objs[0])
