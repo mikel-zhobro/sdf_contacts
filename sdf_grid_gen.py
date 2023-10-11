@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 from sdf import *
+import numpy as np
 
-# Create sdf
+# Create 3D sdf
 f = circle(0.2).repeat(1, (2,0)).extrude(0.4)
 
 # Estimate box bounds of the sdf

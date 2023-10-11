@@ -5,8 +5,9 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.pyplot as plt
 import multiprocessing
 import itertools
-import numpy as np
 import time
+import numpy as np
+import torch
 
 from . import progress, stl, torch_util as tu
 
@@ -22,7 +23,7 @@ def cartesian_product(*arrays):
         arr[...,i] = a
     return arr.reshape(-1, la)
 
-def estimate_bounds(sdf, verbose=True):
+def estimate_bounds(sdf, verbose=False):
     """
     ------ Estimate bounds of the sdf (dimension agnostic) ------
     starts with a small cube and expands it until sdf is contained
@@ -35,19 +36,20 @@ def estimate_bounds(sdf, verbose=True):
     prev = None
     for i in range(32):
         Cs = [np.linspace(x0, x1, s) for x0, x1 in zip(c0, c1)] # linspace for each dimension - (s,s,s) cubes [dim, s]
-        d = np.array([X[1] - X[0] for X in Cs]) # the diagonal of one of the (s,s,s) cubes
+        d = np.abs(np.array([X[1] - X[0] for X in Cs])) # the diagonal of one of the (s,s,s) cubes
         threshold = np.linalg.norm(d) * 2 /3 # closer than the half of the diagonal is considered inside (changed to 2/3)
-        threshold = np.abs(d).mean() * 2 /3 # closer than the half of the diagonal is considered inside (changed to 2/3)
+        # threshold = np.abs(d).mean() * 2 /3 # closer than the half of the diagonal is considered inside (changed to 2/3)
         if threshold == prev:
             break
         prev = threshold
         P = cartesian_product(*Cs) # shape: (s**n, n) where n can be 2 or 3 -- kind of meshgrid
         volume = sdf(tu.to_torch(P)).reshape(tuple([len(X) for X in Cs])) # (s, s, s) or (s, s)
-        where = np.argwhere(np.abs(volume.numpy()) <= threshold)
+        where = np.argwhere(np.abs(volume.numpy()) <= threshold+1)
+        # where = np.argwhere(np.abs(volume.numpy()) <= threshold)
 
         c1 = c0 + where.max(axis=0) * d + d / 2
         c0 = c0 + where.min(axis=0) * d - d / 2
-
+    if verbose:
         print(f"min/max coord: {where.max(axis=0)}, {where.min(axis=0)}")
         print(f"iteration {i} - threshold: {threshold} - c0: {c0} - c1: {c1}")
     # explain this function:
@@ -56,6 +58,39 @@ def estimate_bounds(sdf, verbose=True):
     if verbose:
         print(c0, c1)
     return c0, c1
+
+def estimate_bounds2_0(sdf, min=-10., max=10, verbose=True):
+    """
+    ------ Estimate bounds of the sdf (dimension agnostic) ------
+    Same as above only that surface normals are used to expand the cube until the sdf is contained
+    """
+    n = sdf.dim
+    s = 16
+    c0 = np.zeros(n) - max #
+    c1 = np.zeros(n) + max #
+    prev = None
+    print(f"iteration {0} - c0: {c0} - c1: {c1}")
+    for i in range(1):
+        Cs = [np.linspace(x0, x1, s) for x0, x1 in zip(c0, c1)] # linspace for each dimension - (s,s,s) cubes [dim, s]
+        d = np.abs(np.array([X[1] - X[0] for X in Cs])) # the diagonal of one of the (s,s,s) cubes
+
+        P = tu.to_torch(cartesian_product(*Cs)).requires_grad_() # shape: (s**n, n) where n can be 2 or 3 -- kind of meshgrid
+        volume: torch.Tensor = sdf(P).reshape(tuple([len(X) for X in Cs])) # (s, s, s) or (s, s)
+        volume.sum().backward()
+        assert P.grad is not None
+        vec_2_surface = np.abs(P.grad.numpy().reshape(tuple([len(X) for X in Cs]+[-1])) * volume.detach().numpy()[...,None]) # (s**n, n) * (s, s, s) = (s, s, s, n)
+
+        where = np.argwhere(np.logical_and(vec_2_surface[:,:,0] <= d[0], vec_2_surface[:,:,1] <= d[1]))
+
+        c1 = c0 + where.max(axis=0) * d + d / 2
+        c0 = c0 + where.min(axis=0) * d - d / 2
+
+        # print(f"min/max coord: {where.max(axis=0)}, {where.min(axis=0)}")
+        print(f"iteration {i} - c0: {c0} - c1: {c1}, 'd': {d} {where.min(axis=0)}, {where.max(axis=0)}")
+    # return np.where(c0 < min, min, c0), np.where(c1 > max, max, c0)
+    return np.clip(c0-d-1., min, max), np.clip(c1+d+1., min, max)
+
+
 
 def _worker(sdf, job, sparse):
     # Help functions for worker

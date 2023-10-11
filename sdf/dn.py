@@ -115,4 +115,3 @@ def repeat(other, spacing, count=None, padding=0):
             a = _min(a, b)
         return a
     return f
-1

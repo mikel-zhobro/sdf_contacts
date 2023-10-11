@@ -15,7 +15,7 @@ def obj(sdf1: torch.Tensor, sdf2: torch.Tensor, lamda: torch.Tensor=None):
     return sdf1 + sdf2 + (sdf1 - sdf2)**2
 
 
-def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=300):
+def find_contacts_and_vis(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=300):
     # Get sample-set
     x_min, x_max = estimate_bounds(sdf_func1 | sdf_func2)
     Xs = [np.linspace(x0, x1, 40) for x0, x1 in zip(x_min, x_max)]
@@ -29,7 +29,8 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=300):
     cand_pts_init =  x_min + torch.rand(n_cand, 3) * (x_max - x_min)
     cand_pts = cand_pts_init.clone().requires_grad_(True)
 
-    opt = torch.optim.SGD([cand_pts], lr=lr)
+    # opt = torch.optim.SGD([cand_pts], lr=lr)
+    opt = torch.optim.Adam([cand_pts], lr=lr, weight_decay=1e-5)
 
     start = time.time()
     for i in range(max_iter):
@@ -78,8 +79,8 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=300):
         mymesh.set_alpha(0.2)
         ax.add_collection3d(mymesh)
 
-    ax.scatter(cand_pts_init[:, 0], cand_pts_init[:, 1], cand_pts_init[:, 2], c='r', alpha=0.3, s=7, label=f'the {n_cand} initial points')
-    ax.scatter(cand_pts[:, 0], cand_pts[:, 1], cand_pts[:, 2], c='b', alpha=0.3, s=7, label='candidate points')
+    # ax.scatter(cand_pts_init[:, 0], cand_pts_init[:, 1], cand_pts_init[:, 2], c='r', alpha=0.3, s=7, label=f'the {n_cand} initial points')
+    # ax.scatter(cand_pts[:, 0], cand_pts[:, 1], cand_pts[:, 2], c='b', alpha=0.3, s=7, label='candidate points')
     ax.scatter(unique_points[:, 0], unique_points[:, 1], unique_points[:, 2], c='k', marker='x',s=42, label=f'the {n_unique} unique points')
     ax.set_xlim(left=x_min[0], right=x_max[0])
     ax.set_ylim(bottom=x_min[1], top=x_max[1])
@@ -92,7 +93,7 @@ def main(sdf_func1, sdf_func2, max_iter=1000, lr=1e-2, n_cand=300):
 
 
 def pair1():
-    return d3.box(size=2.), d3.sphere(center=(1.5, 1.5, 1.5), radius=1.)
+    return d3.box(a=[-12,-12,0.], b=[12,12,0.4]), d3.box(center=(0, 0, 0.75), size=4.5)
 
 def pair2():
     return d3.box(size=2.), d3.sphere(center=(1.5, 0.0, 0.0), radius=0.5)
@@ -118,8 +119,16 @@ def pair5():
     return d3.box(size=(2., 5., 5)), d3.box(center=(2., 0., 0.), size=2.)
 
 def pair6():
-    return d3.box(size=(2., 5., 5)), d3.box(center=(2., 0., 0.), size=2.) & d3.capped_cylinder(1, 2, 0.5)
+    return d3.box(size=(2., 5., 5), center=(0, 3.65, 0)), d3.capped_cylinder(-d3.Y*5, d3.Y*5, 0.5).rotate(np.pi/3, vector=d3.Z)
+
+def pair7():
+    return d3.box(center=(0., 0., 0), size=[10.,10.,0.5]), d3.box(center=(0., 0., 4.73), size=4.).rotate(np.pi/15., vector=d3.X).rotate(np.pi/16., vector=d3.Y)
 
 if __name__ == "__main__":
-    main(*pair4(), 190, 1e-1, n_cand=300)
-
+    find_contacts_and_vis(*pair4(), 600, 1e-1, n_cand=300)
+    find_contacts_and_vis(*pair1(), 600, 1e-1, n_cand=300)
+    find_contacts_and_vis(*pair2(), 600, 1e-1, n_cand=300)
+    find_contacts_and_vis(*pair3(), 600, 1e-1, n_cand=300)
+    find_contacts_and_vis(*pair5(), 600, 1e-1, n_cand=300)
+    find_contacts_and_vis(*pair6(), 600, 1e-1, n_cand=300)
+    find_contacts_and_vis(*pair7(), 600, 1e-1, n_cand=300)

@@ -1,24 +1,47 @@
-# sdf-torch (private)
+# sdf-contacts
 
-This is a fork of [fogleman/sdf](https://github.com/fogleman/sdf) that uses PyTorch instead of numpy for batched computation.
+This is a fork of [fogleman/sdf](https://github.com/fogleman/sdf) that uses PyTorch instead of numpy for batched computation. In addition to that we have added functionalities for contact detection and visualization.
+To get started and get a feeling about sdfs follow the [Old-Readme/Example](#example) section below.
 
-Here are some timings from a few example scripts(for samples=2**8):
+## Installation
+To install the package run
+``` bash
+git clone https://gitlab.localnet/embodied-vision/mikel-zhobro/planning-with-differentiable-physics/sdf_contacts.git
+pip install .
+```
+
+## Contact detection
+Good scripts to get started for sdf-sdf contact detection are [sdf_sdf_2D_contact.py](sdf_sdf_2D_contact.py) and [sdf_sdf_3D_contact.py](sdf_sdf_3D_contact.py).
 
 
-| Example    | numpy    | torch, CPU | torch, GPU |
-|------------|----------|------------|------------|
-| blobby     | 9.295s   | 5.860s     |     0s     |  
-| gear       | 11.516s  | 5.017s     |     0s     |  
-| weave      | 221.054s | 86.803s    |     0s     |  
-| knurling   | 32.616s  | 11.198s    |     0s     |  
-| pawn       | 15.155s  | 10.697s    |     0s     |  
-| text       | 8.641s   | 3.710s     |     0s     |  
-| image      | 13.358s  | 3.363s     |     0s     |  
-| example    | 8.445s   | 2.381s     |     0s     |  
+## Organization
+```
+README.md                   # this file
+setup.py                    # setup file for the package
+
+sdf_grid_gen.py             # script for generating a sdf grid
+sdf_sdf_2D_contact.py       # script for sdf-sdf contact detection and visualization in 2D
+sdf_sdf_3D_contact.py       # script for sdf-sdf contact detection and visualization in 3D
+
+sdf                         # package containing the code
+├── d2.py                   # 2D sdf functions
+├── d3.py                   # 3D sdf functions
+├── dn.py                   # dimension agnostic operations (e.g. union, intersection, etc.)
+├── ease.py                 # easing functions
+├── mesh.py                 # mesh generation utils but also bound estimation and plotting
+├── progress.py             # progress bar without any dependencies
+├── stl.py                  # stl file writer
+├── text.py                 # sdf for text
+└── torch_util.py           # torch utility functions
+
+```
 
 ## Contact detection
 Some examples for contact detection and their visualiztion can be  found in [play.py](play.py) and [play3d.py](play3d.py).
 
+
+
+# _________________________________________________________
 # Old README
 Generate 3D meshes based on SDFs (signed distance functions) with a
 dirt simple Python API.
