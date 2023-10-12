@@ -36,11 +36,6 @@ sdf                         # package containing the code
 
 ```
 
-## Contact detection
-Some examples for contact detection and their visualiztion can be  found in [play.py](play.py) and [play3d.py](play3d.py).
-
-
-
 # _________________________________________________________
 # Old README
 Generate 3D meshes based on SDFs (signed distance functions) with a
