@@ -8,7 +8,7 @@ setup(
     author_email='michael.fogleman@gmail.com',
     packages=['sdf'],
      install_requires=[
-         'torch'
+         'torch',
          'matplotlib',
          'meshio',
          'numpy',

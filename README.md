@@ -6,7 +6,7 @@ To get started and get a feeling about SDFs in general follow the [Old-Readme/Ex
 ## Installation
 To install the package run
 ``` bash
-git clone https://gitlab.localnet/embodied-vision/mikel-zhobro/planning-with-differentiable-physics/sdf_contacts.git
+git clone https://github.com/mikel-zhobro/sdf_contacts.git
 pip install .
 ```
 
