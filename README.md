@@ -1,7 +1,7 @@
 # sdf-contacts
 
-This is a fork of [fogleman/sdf](https://github.com/fogleman/sdf) that uses PyTorch instead of numpy for batched computation. In addition to that we have added functionalities for contact detection and visualization.
-To get started and get a feeling about sdfs follow the [Old-Readme/Example](#example) section below.
+This is a fork of [fogleman/sdf](https://github.com/fogleman/sdf) that uses PyTorch instead of numpy for batched SDF computation. In addition to that we have added functionalities for contact detection and visualization.
+To get started and get a feeling about SDFs in general follow the [Old-Readme/Example](#example) section below.
 
 ## Installation
 To install the package run
